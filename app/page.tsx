@@ -1,5 +1,6 @@
 'use client';
 import AlertsPanel from "@/components/AlertsPanel";
+import type { HotelSnapshot, Recommendation } from "@/lib/types";
 import { useState } from 'react';
 
 const STAR_COLORS: Record<number, string> = {
@@ -19,11 +20,11 @@ const STAR_BG: Record<number, string> = {
 export default function Home() {
   const [step, setStep] = useState<'search' | 'onboard' | 'results'>('search');
   const [city, setCity] = useState('');
-  const [hotels, setHotels] = useState<any[]>([]);
+  const [hotels, setHotels] = useState<HotelSnapshot[]>([]);
   const [currency, setCurrency] = useState<{ code: string; symbol: string; name: string }>({ code: 'USD', symbol: '$', name: 'US Dollar' });
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<number>(3);
-  const [recommendation, setRecommendation] = useState<any>(null);
+  const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
   const [recLoading, setRecLoading] = useState(false);
   const [recError, setRecError] = useState<string | null>(null);
 
@@ -39,12 +40,18 @@ export default function Home() {
 
   const searchHotels = async () => {
     setLoading(true);
-    const res = await fetch(`/api/hotels?city=${encodeURIComponent(city)}`);
-    const data = await res.json();
-    setHotels(data.data || []);
-    if (data.currency) setCurrency(data.currency);
-    setLoading(false);
-    setStep('onboard');
+    try {
+      const res = await fetch(`/api/hotels?city=${encodeURIComponent(city)}`);
+      const data = await res.json();
+      setHotels(data.data || []);
+      if (data.currency) setCurrency(data.currency);
+      setStep('onboard');
+    } catch {
+      setHotels([]);
+      setStep('onboard');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getRecommendation = async () => {
@@ -99,8 +106,10 @@ export default function Home() {
     high: 'text-red-400',
   };
 
+  const canRecommend = hotelName && currentPrice && occupancy && Number(occupancy) >= 0 && Number(occupancy) <= 100;
+
   return (
-    <main className="min-h-screen bg-gray-950 text-white p-8">
+    <main className="min-h-screen bg-gray-950 text-white px-4 py-6 sm:p-8">
       <div className="max-w-4xl mx-auto">
 
         {/* Header */}
@@ -111,9 +120,9 @@ export default function Home() {
 
         {/* STEP 1 — City Search */}
         {step === 'search' && (
-          <div className="bg-gray-900 rounded-2xl p-8">
+          <div className="bg-gray-900 rounded-2xl p-5 sm:p-8">
             <h2 className="text-xl font-semibold mb-6">Where is your hotel?</h2>
-            <div className="flex gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <input
                 type="text"
                 placeholder="Enter city (e.g. New York, London, Dubai)"
@@ -127,7 +136,7 @@ export default function Home() {
                 disabled={loading || !city}
                 className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-50"
               >
-                {loading ? 'Loading...' : 'Continue →'}
+                {loading ? 'Loading...' : 'Continue'}
               </button>
             </div>
           </div>
@@ -135,8 +144,11 @@ export default function Home() {
 
         {/* STEP 2 — Hotel Onboarding */}
         {step === 'onboard' && (
-          <div className="bg-gray-900 rounded-2xl p-8">
+          <div className="bg-gray-900 rounded-2xl p-5 sm:p-8">
             <h2 className="text-xl font-semibold mb-6">Tell us about your hotel</h2>
+            <p className="text-gray-400 text-sm mb-5">
+              Using {hotels.length ? `${hotels.length} live competitor rates` : 'demo competitor data'} for {city || 'your market'}.
+            </p>
             <div className="grid gap-5">
 
               <div>
@@ -169,7 +181,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid gap-4 sm:grid-cols-3">
                 <div>
                   <label className="text-gray-400 text-sm mb-1 block">Current Price Tonight ({currency.symbol})</label>
                   <input
@@ -204,7 +216,7 @@ export default function Home() {
 
               <div>
                 <label className="text-gray-400 text-sm mb-3 block">Amenities Included</label>
-                <div className="flex gap-3">
+                <div className="grid gap-3 sm:grid-cols-3">
                   {[
                     { label: '🍳 Breakfast', val: breakfast, set: setBreakfast },
                     { label: '🅿️ Parking', val: parking, set: setParking },
@@ -232,10 +244,10 @@ export default function Home() {
               )}
               <button
                 onClick={getRecommendation}
-                disabled={recLoading || !hotelName || !currentPrice || !occupancy}
+                disabled={recLoading || !canRecommend}
                 className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-lg font-bold text-lg transition-colors disabled:opacity-50"
               >
-                {recLoading ? '🤖 Analyzing market...' : 'Get My Price Recommendation →'}
+                {recLoading ? 'Analyzing market...' : 'Get My Price Recommendation'}
               </button>
             </div>
           </div>
@@ -253,18 +265,18 @@ export default function Home() {
                   {recommendation.urgency} urgency
                 </span>
               </div>
-              <div className="flex items-center gap-6 mb-4">
+              <div className="grid gap-4 sm:flex sm:items-center sm:gap-6 mb-4">
                 <div>
                   <p className="text-gray-400 text-sm">Your Current Price</p>
                   <p className="text-white text-3xl font-bold">{fmt(Number(currentPrice))}</p>
                 </div>
-                <div className="text-4xl">→</div>
+                <div className="hidden text-4xl sm:block">→</div>
                 <div>
                   <p className="text-emerald-400 text-sm">Recommended Price</p>
                   <p className="text-emerald-400 text-4xl font-bold">{fmt(recommendation.recommendedPrice)}</p>
                 </div>
                 {recommendation.revenueBreakdown && (
-                  <div className="ml-auto text-right">
+                  <div className="sm:ml-auto sm:text-right">
                     <p className="text-gray-400 text-sm">Extra per week</p>
                     <p className={`text-2xl font-bold ${recommendation.revenueBreakdown.extraPerWeek >= 0 ? 'text-yellow-400' : 'text-red-400'}`}>
                       {recommendation.revenueBreakdown.extraPerWeek >= 0 ? '+' : ''}{fmt(Math.abs(recommendation.revenueBreakdown.extraPerWeek))}
@@ -363,8 +375,8 @@ export default function Home() {
             {/* 7 Day Calendar */}
             <div className="bg-gray-900 rounded-2xl p-6">
               <h2 className="text-xl font-bold mb-4">7-Day Pricing Calendar</h2>
-              <div className="grid grid-cols-7 gap-2">
-                {recommendation.weeklyPricing?.map((day: any) => (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-7">
+                {recommendation.weeklyPricing?.map((day) => (
                   <div key={day.day} className="bg-gray-800 rounded-xl p-3 text-center">
                     <p className="text-gray-400 text-xs mb-1">{day.day.slice(0, 3)}</p>
                     <p className="text-emerald-400 font-bold">{fmt(day.price)}</p>
@@ -383,7 +395,7 @@ export default function Home() {
                   <h2 className="text-xl font-bold mb-1">Revenue Impact Breakdown</h2>
                   <p className="text-gray-500 text-sm mb-5">Formula: Price × Occupancy % × Rooms = Revenue/night</p>
 
-                  <div className="grid grid-cols-2 gap-4 mb-5">
+              <div className="grid gap-4 mb-5 sm:grid-cols-2">
                     <div className="bg-gray-800 rounded-xl p-4">
                       <p className="text-gray-400 text-xs uppercase tracking-wide mb-2">Current</p>
                       <p className="text-white font-mono text-sm">
@@ -444,7 +456,7 @@ export default function Home() {
             {/* Market Summary */}
             <div className="bg-gray-900 rounded-2xl p-6">
               <h2 className="text-xl font-bold mb-4">Market Overview — {stars}⭐ Hotels in {city}</h2>
-              <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="grid gap-4 mb-6 sm:grid-cols-3">
                 {[3, 4, 5].map((s) => (
                   <div key={s} className={`rounded-xl p-4 border ${STAR_BG[s]}`}>
                     <p className={`font-bold ${STAR_COLORS[s]}`}>{'⭐'.repeat(s)}</p>
@@ -455,7 +467,7 @@ export default function Home() {
               </div>
 
               {/* Tabs */}
-              <div className="flex gap-2 mb-4">
+              <div className="flex flex-wrap gap-2 mb-4">
                 {[3, 4, 5].map((s) => (
                   <button
                     key={s}
@@ -471,8 +483,9 @@ export default function Home() {
 
               <div className="grid gap-3">
                 {hotelsByStars(activeTab).map((hotel) => (
-                  <div key={hotel.id} className={`rounded-xl p-4 flex items-center gap-4 border ${STAR_BG[activeTab]}`}>
+                  <div key={hotel.id} className={`rounded-xl p-4 grid gap-3 border sm:flex sm:items-center sm:gap-4 ${STAR_BG[activeTab]}`}>
                     {hotel.photoUrls?.[0] && (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img src={hotel.photoUrls[0]} className="w-14 h-14 rounded-lg object-cover" alt={hotel.name} />
                     )}
                     <div className="flex-1">

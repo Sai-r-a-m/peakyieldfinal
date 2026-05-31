@@ -50,7 +50,8 @@ export default function AlertsPanel() {
   }
 
   useEffect(() => {
-    fetchAlerts();
+    const timeout =
+      setTimeout(fetchAlerts, 0);
 
     const interval =
       setInterval(
@@ -58,8 +59,10 @@ export default function AlertsPanel() {
         60000
       );
 
-    return () =>
+    return () => {
+      clearTimeout(timeout);
       clearInterval(interval);
+    };
   }, []);
 
   return (
@@ -77,7 +80,7 @@ export default function AlertsPanel() {
       <div className="space-y-4">
         {alerts.length === 0 && (
           <div className="text-gray-400">
-            No alerts yet
+            No current alerts
           </div>
         )}
 

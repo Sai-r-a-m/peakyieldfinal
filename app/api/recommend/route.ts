@@ -1,19 +1,33 @@
 import { NextResponse } from 'next/server';
 import { estimateRevenueImpact } from '@/lib/revenue-utils';
 import { calculateBasePrice } from '@/lib/pricing-utils';
+import type { HotelSnapshot } from '@/lib/types';
+
+interface RecommendRequest {
+  hotelName: string;
+  stars: number;
+  currentPrice: number;
+  occupancy: number;
+  rooms?: number;
+  breakfast: boolean;
+  parking: boolean;
+  cancellation: boolean;
+  competitors?: HotelSnapshot[];
+  currency?: { code: string; symbol: string; name: string };
+}
 
 export async function POST(request: Request) {
-  const body = await request.json();
+  const body = (await request.json()) as RecommendRequest;
   const {
     hotelName, stars, currentPrice, occupancy, rooms = 50,
     breakfast, parking, cancellation, competitors,
     currency = { code: 'USD', symbol: '$', name: 'US Dollar' },
   } = body;
 
-  const sameStarCompetitors = competitors.filter((h: any) => h.propertyClass === stars);
+  const sameStarCompetitors = (competitors || []).filter((h) => h.propertyClass === stars);
 
   const prices = sameStarCompetitors
-    .map((h: any) => h.priceBreakdown?.grossPrice?.value || 0)
+    .map((h) => h.priceBreakdown?.grossPrice?.value || 0)
     .filter((p: number) => p > 0);
 
   const marketAvg = prices.length
@@ -58,7 +72,7 @@ LIVE MARKET DATA:
 - Current occupancy: ${occupancy}%
 
 Top competitors:
-${sameStarCompetitors.slice(0, 5).map((h: any) =>
+${sameStarCompetitors.slice(0, 5).map((h) =>
   `- ${h.name}: ${h.priceBreakdown?.grossPrice?.amountRounded} (score: ${h.reviewScore})`
 ).join('\n')}
 

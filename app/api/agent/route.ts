@@ -9,6 +9,7 @@ import {
   calculateAveragePrice,
   getPriceGap,
 } from "@/lib/market-utils";
+import type { HotelSnapshot } from "@/lib/types";
 
 async function fetchCompetitors(
   city: string
@@ -53,7 +54,11 @@ async function generateAIAlert({
   hotel,
   oldPrice,
   newPrice,
-}: any) {
+}: {
+  hotel: HotelSnapshot;
+  oldPrice: number;
+  newPrice: number;
+}) {
   try {
     const prompt = `
 You are an AI hotel revenue manager.
@@ -170,13 +175,41 @@ export async function POST(
   req: NextRequest
 ) {
   try {
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Supabase service role credentials are required for the monitoring agent.",
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
     const { hotels } =
-      await req.json();
+      (await req.json()) as {
+        hotels: HotelSnapshot[];
+      };
 
     const results = [];
 
     for (const hotel of hotels) {
       try {
+        if (!hotel.city || !hotel.name) {
+          results.push({
+            hotel:
+              hotel.name || "Unknown hotel",
+            alert: false,
+            skipped: true,
+            reason:
+              "Missing hotel name or city",
+          });
+
+          continue;
+        }
+
         console.log(
           `Monitoring ${hotel.name}`
         );

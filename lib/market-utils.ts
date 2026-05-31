@@ -1,5 +1,7 @@
+import type { HotelSnapshot } from "@/lib/types";
+
 export function calculateAveragePrice(
-  hotels: any[],
+  hotels: HotelSnapshot[],
   star: number
 ) {
   const filtered = hotels.filter(
